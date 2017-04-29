@@ -12,6 +12,10 @@
 //based on the algorithm then sort the vector
 //FCFS - sort by arrival time
 //SJF - sort by burst time
+	// sort by arrival time then burst time
+	// keep a counter of elapsed time
+	// compare all items in vectors arrival time to see if they are <= elapsed time
+	// if so, put into new vector, sort by burst time, schedule the first process
 //RR
 //http://stackoverflow.com/questions/4892680/sorting-a-vector-of-structs
 
@@ -26,11 +30,15 @@ bool compare_by_arrival_time(const Process *a, const Process *b) {
 }
 
 //sorts on arrival time then sorts on burst time
-bool compare_by_burst_time(const Process *a, const Process *b) {
+bool compare_by_arrival_then_burst(const Process *a, const Process *b) {
     if (a->arrival_time != b->arrival_time) {
     	return a->arrival_time < b->arrival_time;
     }
     return a->burst_time < b->burst_time;
+}
+
+bool compare_by_burst(const Process *a, const Process *b) {
+	return a->burst_time < b->burst_time;
 }
 
 int main(int argc, char **argv) {
@@ -94,5 +102,75 @@ int main(int argc, char **argv) {
 		std::cout << "Average wait time: " << (float)wait_time/(float)throughput << std::endl;
 		std::cout << "Average turnaround time: " << (float)turnaround_time/(float)throughput << std::endl;
 		std::cout << "Remaining tasks: " << remaining_tasks << std::endl;
+
+	} else if (algorithm == "SJF") {
+		std::vector<Process*>arrived_processes;
+		std::sort(processes.begin(), processes.end(), compare_by_arrival_then_burst);
+
+		for (int i = 0; i < processes.size(); ++i) {
+			std::cout << "PID: " << processes[i]->PID << " Arrival: " << processes[i]->arrival_time << " Burst: " << processes[i]->burst_time << std::endl;
+		}
+		while (time < processes[0]->arrival_time) {
+			time += 1;
+		}
+		std::cout << time << ": scheduling PID " << processes[0]->PID << " : CPU = " << processes[0]->burst_time << std::endl;
+		time += processes[0]->burst_time;
+		processes.erase(processes.begin());
+		for (int i = 0; i < processes.size(); ++i) {
+			std::cout << "PID: " << processes[i]->PID << " Arrival: " << processes[i]->arrival_time << " Burst: " << processes[i]->burst_time << std::endl;
+		}
+		while (processes.size() > 0) {
+			arrived_processes.clear();
+			for (int i = 0; i < processes.size(); ++i) {
+				if (processes[i]->arrival_time <= time) {
+					arrived_processes.push_back(processes[i]);
+				}
+			}
+			std::sort(arrived_processes.begin(), arrived_processes.end(), compare_by_burst);
+			std::cout << "Sorted\n";
+			for (int i = 0; i < arrived_processes.size(); ++i) {
+				std::cout << "PID: " << arrived_processes[i]->PID << " Arrival: " << arrived_processes[i]->arrival_time << " Burst: " << arrived_processes[i]->burst_time << std::endl;
+			}
+			std::cout << time << ": scheduling PID " << arrived_processes[0]->PID << " : CPU = " << arrived_processes[0]->burst_time << std::endl;
+			for (int i = 0; i < processes.size(); ++i) {
+				if (processes[i]->PID == arrived_processes[0]->PID) {
+					time += processes[i]->burst_time;
+					processes.erase(processes.begin() + i);
+				}
+			}
+			std::cout << "New processes vector\n";
+			for (int i = 0; i < processes.size(); ++i) {
+				std::cout << "PID: " << processes[i]->PID << " Arrival: " << processes[i]->arrival_time << " Burst: " << processes[i]->burst_time << std::endl;
+			}
+		}
+	} else if (algorithm == "RR") {
+		std::sort(processes.begin(), processes.end(), compare_by_arrival_time);
+
+		for (int i = 0; i < processes.size(); ++i) {
+			std::cout << "PID: " << processes[i]->PID << " Arrival: " << processes[i]->arrival_time << " Burst: " << processes[i]->burst_time << std::endl;
+		}
+
+		std::vector<Process*>::iterator it;
+		for (it = processes.begin(); it != processes.end(); ) {
+			std::cout << time << ": scheduling PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
+			if ((*it)->burst_time < time_slice) {
+				time += (*it)->burst_time;
+				std::cout << time << " : PID " << (*it)->PID << " terminated" << std::endl;
+				it = processes.erase(it);
+			} else {
+				time += time_slice;
+				(*it)->burst_time -= time_slice;
+				if ((*it)->burst_time != 0) {
+					std::cout << time << " : suspending PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
+					it++;
+				} else {
+					std::cout << time << " : PID " << (*it)->PID << " terminated" << std::endl;
+					it = processes.erase(it);
+				}	
+			}
+			if (it == processes.end() && processes.size() > 0) {
+				it = processes.begin();
+			}
+		}
 	}
 }
