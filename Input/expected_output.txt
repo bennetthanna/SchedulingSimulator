@@ -1,0 +1,47 @@
+FCFS1
+Avg wait time = 17
+Avg turnaround time = 27
+
+FCFS2
+Avg wait time = 3
+Avg turnaround time = 13
+
+FCFS3
+Avg wait time = 8.33
+Avg turnaround time = 17.33
+
+FCFS4
+Avg wait time = 28
+Avg turnaround time = 40.2
+
+SJF1
+Avg wait time = 7
+Avg turnaround time = 13
+
+SJF2
+Avg wait time = 5.67
+Avg turnaround time = 19
+
+SJF3
+Avg wait time = 4
+Avg turnaround time = 8
+
+SJF4
+Avg wait time = 13
+Avg turnaround time = 25.2
+
+RR1 (time_slice = 4)
+Avg wait time = 5.67
+Avg turnaround time = 15.67
+
+RR2 (time_slice = 20)
+Avg wait time = 73
+Avg turnaround time = 113.5
+
+RR3 (time_slice = 4)
+Avg wait time = 5.67
+Avg turnaround time = 15.67
+
+RR4 (time_slice = 10)
+Avg wait time = 23
+Avg turnaround time = 35.2
