@@ -155,12 +155,9 @@ int main(int argc, char **argv) {
 			while (time < processes[0]->arrival_time) {
 				time += 1;
 			}
-			if ((*it)->burst_time <= time_slice) {
-				wait_time += (time - (*it)->arrival_time - ((*it)->times_scheduled * time_slice));
-			}
-
 			if (time_slice > (*it)->burst_time) {
 				if ((time + (*it)->burst_time) > simulation_time) {
+					std::cout << "OUT OF TIME!" << std::endl;
 					break;
 				}
 			} else {
@@ -168,6 +165,9 @@ int main(int argc, char **argv) {
 					std::cout << "OUT OF TIME!" << std::endl;
 					break;
 				}
+			}
+			if ((*it)->burst_time <= time_slice) {
+				wait_time += (time - (*it)->arrival_time - ((*it)->times_scheduled * time_slice));
 			}
 			std::cout << time << ": scheduling PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
 			(*it)->times_scheduled++;
@@ -183,7 +183,11 @@ int main(int argc, char **argv) {
 				(*it)->burst_time -= time_slice;
 				if ((*it)->burst_time != 0) {
 					std::cout << time << " : suspending PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
-					it++;
+					if ((*(it++))->arrival_time < time) {
+						it = processes.begin();
+					} else {
+						it++;
+					}
 				} else {
 					std::cout << time << " : PID " << (*it)->PID << " terminated" << std::endl;
 					turnaround_time += (time - (*it)->arrival_time);
