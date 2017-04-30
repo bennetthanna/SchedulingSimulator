@@ -4,7 +4,7 @@
 #include <vector>
 #include <algorithm>
 
-int remaining_tasks = 0, throughput = 0, wait_time = 0, turnaround_time = 0;
+int remaining_tasks = 0, throughput = 0, wait_time = 0, turnaround_time = 0, elapsed_time = 0, simulation_time, time_slice;
 
 struct Process {
 	int PID;
@@ -12,6 +12,8 @@ struct Process {
 	int burst_time;
 	int times_scheduled;
 };
+
+std::vector<Process*>processes;
 
 bool compare_by_arrival(const Process *a, const Process *b) {
     return a->arrival_time < b->arrival_time;
@@ -35,12 +37,140 @@ void print_stats() {
 	std::cout << "Remaining tasks: " << remaining_tasks << std::endl;
 }
 
+void first_come_first_serve(std::vector<Process*>processes) {
+	std::sort(processes.begin(), processes.end(), compare_by_arrival);
+	remaining_tasks = processes.size();
+
+	std::cout << "=================================" << std::endl;
+	for (int i = 0; i < processes.size(); ++i) {
+		while (elapsed_time < processes[i]->arrival_time) {
+			elapsed_time += 1;
+		}
+		if ((elapsed_time + processes[i]->burst_time) > simulation_time) {
+			std::cout << "OUT OF TIME!" << std::endl;
+			break;
+		}
+		wait_time += (elapsed_time - processes[i]->arrival_time);
+		std::cout << elapsed_time << ": scheduling PID " << processes[i]->PID << " : CPU = " << processes[i]->burst_time << std::endl;
+		elapsed_time += processes[i]->burst_time;
+		turnaround_time += (elapsed_time - processes[i]->arrival_time);
+		std::cout << elapsed_time << " : PID " << processes[i]->PID << " terminated" << std::endl;
+		throughput++;
+		remaining_tasks--;
+	}
+	std::cout << "=================================" << std::endl;
+}
+
+void shortest_job_first(std::vector<Process*>processes) {
+	std::vector<Process*>arrived_processes;
+	std::sort(processes.begin(), processes.end(), compare_by_arrival_then_burst);
+	remaining_tasks = processes.size();
+
+	std::cout << "=================================" << std::endl;
+	while (elapsed_time < processes[0]->arrival_time) {
+		elapsed_time += 1;
+	}
+	if ((elapsed_time + processes[0]->burst_time) > simulation_time) {
+		std::cout << "OUT OF TIME!" << std::endl;
+	} else {
+		wait_time += (elapsed_time - processes[0]->arrival_time);
+		std::cout << elapsed_time << ": scheduling PID " << processes[0]->PID << " : CPU = " << processes[0]->burst_time << std::endl;
+		elapsed_time += processes[0]->burst_time;
+		turnaround_time += (elapsed_time - processes[0]->arrival_time);
+		std::cout << elapsed_time << " : PID " << processes[0]->PID << " terminated" << std::endl;
+		throughput++;
+		remaining_tasks--;
+		processes.erase(processes.begin());
+
+		while (processes.size() > 0) {
+			arrived_processes.clear();
+			for (int i = 0; i < processes.size(); ++i) {
+				if (processes[i]->arrival_time <= elapsed_time) {
+					arrived_processes.push_back(processes[i]);
+				}
+			}
+			std::sort(arrived_processes.begin(), arrived_processes.end(), compare_by_burst);
+			while (elapsed_time < arrived_processes[0]->arrival_time) {
+				elapsed_time += 1;
+			}
+			if ((elapsed_time + arrived_processes[0]->burst_time) > simulation_time) {
+				std::cout << "OUT OF TIME!" << std::endl;
+				break;
+			}
+			wait_time += (elapsed_time - arrived_processes[0]->arrival_time);
+			std::cout << elapsed_time << ": scheduling PID " << arrived_processes[0]->PID << " : CPU = " << arrived_processes[0]->burst_time << std::endl;
+			for (int i = 0; i < processes.size(); ++i) {
+				if (processes[i]->PID == arrived_processes[0]->PID) {
+					elapsed_time += processes[i]->burst_time;
+					turnaround_time += (elapsed_time - processes[i]->arrival_time);
+					std::cout << elapsed_time << " : PID " << processes[i]->PID << " terminated" << std::endl;
+					throughput++;
+					remaining_tasks--;
+					processes.erase(processes.begin() + i);
+				}
+			}
+		}
+	}
+	std::cout << "=================================" << std::endl;
+}
+
+void round_robin(std::vector<Process*>processes) {
+	std::sort(processes.begin(), processes.end(), compare_by_arrival);
+	remaining_tasks = processes.size();
+	std::cout << "=================================" << std::endl;
+	std::vector<Process*>::iterator it;
+	for (it = processes.begin(); it != processes.end(); ) {
+		while (elapsed_time < processes[0]->arrival_time) {
+			elapsed_time += 1;
+		}
+		if (time_slice > (*it)->burst_time) {
+			if ((elapsed_time + (*it)->burst_time) > simulation_time) {
+				std::cout << "OUT OF TIME!" << std::endl;
+				break;
+			}
+		} else {
+			if ((elapsed_time + time_slice) > simulation_time) {
+				std::cout << "OUT OF TIME!" << std::endl;
+				break;
+			}
+		}
+		if ((*it)->burst_time <= time_slice) {
+			wait_time += (elapsed_time - (*it)->arrival_time - ((*it)->times_scheduled * time_slice));
+		}
+		std::cout << elapsed_time << ": scheduling PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
+		(*it)->times_scheduled++;
+		if ((*it)->burst_time < time_slice) {
+			elapsed_time += (*it)->burst_time;
+			std::cout << elapsed_time << " : PID " << (*it)->PID << " terminated" << std::endl;
+			turnaround_time += (elapsed_time - (*it)->arrival_time);
+			throughput++;
+			remaining_tasks--;
+			it = processes.erase(it);
+		} else {
+			elapsed_time += time_slice;
+			(*it)->burst_time -= time_slice;
+			if ((*it)->burst_time != 0) {
+				std::cout << elapsed_time << " : suspending PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
+				it++;
+			} else {
+				std::cout << elapsed_time << " : PID " << (*it)->PID << " terminated" << std::endl;
+				turnaround_time += (elapsed_time - (*it)->arrival_time);
+				throughput++;
+				remaining_tasks--;
+				it = processes.erase(it);
+			}	
+		}
+		if (it == processes.end() && processes.size() > 0) {
+			it = processes.begin();
+		}
+	}
+	std::cout << "=================================" << std::endl;
+}
+
 int main(int argc, char **argv) {
 
-	std::vector<Process*>processes;
 	Process *process;
-	int PID, arrival_time, burst_time, simulation_time, time_slice; 
-	int time = 0;
+	int PID, arrival_time, burst_time; 
 	std::string algorithm;
 
 	if (argc != 3 && argc != 4) {
@@ -68,139 +198,14 @@ int main(int argc, char **argv) {
 	}
 
 	if (algorithm == "FCFS") {
-
-		std::sort(processes.begin(), processes.end(), compare_by_arrival);
-		remaining_tasks = processes.size();
-
-		std::cout << "=================================" << std::endl;
-		for (int i = 0; i < processes.size(); ++i) {
-			while (time < processes[i]->arrival_time) {
-				time += 1;
-			}
-			if ((time + processes[i]->burst_time) > simulation_time) {
-				std::cout << "OUT OF TIME!" << std::endl;
-				break;
-			}
-			wait_time += (time - processes[i]->arrival_time);
-			std::cout << time << ": scheduling PID " << processes[i]->PID << " : CPU = " << processes[i]->burst_time << std::endl;
-			time += processes[i]->burst_time;
-			turnaround_time += (time - processes[i]->arrival_time);
-			std::cout << time << " : PID " << processes[i]->PID << " terminated" << std::endl;
-			throughput++;
-			remaining_tasks--;
-		}
-
-		std::cout << "=================================" << std::endl;
+		first_come_first_serve(processes);
 		print_stats();
-
 	} else if (algorithm == "SJF") {
-		std::vector<Process*>arrived_processes;
-		std::sort(processes.begin(), processes.end(), compare_by_arrival_then_burst);
-		remaining_tasks = processes.size();
-
-		std::cout << "=================================" << std::endl;
-		while (time < processes[0]->arrival_time) {
-			time += 1;
-		}
-		if ((time + processes[0]->burst_time) > simulation_time) {
-			std::cout << "OUT OF TIME!" << std::endl;
-		} else {
-			wait_time += (time - processes[0]->arrival_time);
-			std::cout << time << ": scheduling PID " << processes[0]->PID << " : CPU = " << processes[0]->burst_time << std::endl;
-			time += processes[0]->burst_time;
-			turnaround_time += (time - processes[0]->arrival_time);
-			std::cout << time << " : PID " << processes[0]->PID << " terminated" << std::endl;
-			throughput++;
-			remaining_tasks--;
-			processes.erase(processes.begin());
-
-			while (processes.size() > 0) {
-				arrived_processes.clear();
-				for (int i = 0; i < processes.size(); ++i) {
-					if (processes[i]->arrival_time <= time) {
-						arrived_processes.push_back(processes[i]);
-					}
-				}
-				std::sort(arrived_processes.begin(), arrived_processes.end(), compare_by_burst);
-				while (time < arrived_processes[0]->arrival_time) {
-					time += 1;
-				}
-				if ((time + arrived_processes[0]->burst_time) > simulation_time) {
-					std::cout << "OUT OF TIME!" << std::endl;
-					break;
-				}
-				wait_time += (time - arrived_processes[0]->arrival_time);
-				std::cout << time << ": scheduling PID " << arrived_processes[0]->PID << " : CPU = " << arrived_processes[0]->burst_time << std::endl;
-				for (int i = 0; i < processes.size(); ++i) {
-					if (processes[i]->PID == arrived_processes[0]->PID) {
-						time += processes[i]->burst_time;
-						turnaround_time += (time - processes[i]->arrival_time);
-						std::cout << time << " : PID " << processes[i]->PID << " terminated" << std::endl;
-						throughput++;
-						remaining_tasks--;
-						processes.erase(processes.begin() + i);
-					}
-				}
-			}
-		}
-		std::cout << "=================================" << std::endl;
+		shortest_job_first(processes);
 		print_stats();
 
 	} else if (algorithm == "RR") {
-		std::sort(processes.begin(), processes.end(), compare_by_arrival);
-		remaining_tasks = processes.size();
-		std::cout << "=================================" << std::endl;
-		std::vector<Process*>::iterator it;
-		for (it = processes.begin(); it != processes.end(); ) {
-			while (time < processes[0]->arrival_time) {
-				time += 1;
-			}
-			if (time_slice > (*it)->burst_time) {
-				if ((time + (*it)->burst_time) > simulation_time) {
-					std::cout << "OUT OF TIME!" << std::endl;
-					break;
-				}
-			} else {
-				if ((time + time_slice) > simulation_time) {
-					std::cout << "OUT OF TIME!" << std::endl;
-					break;
-				}
-			}
-			if ((*it)->burst_time <= time_slice) {
-				wait_time += (time - (*it)->arrival_time - ((*it)->times_scheduled * time_slice));
-			}
-			std::cout << time << ": scheduling PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
-			(*it)->times_scheduled++;
-			if ((*it)->burst_time < time_slice) {
-				time += (*it)->burst_time;
-				std::cout << time << " : PID " << (*it)->PID << " terminated" << std::endl;
-				turnaround_time += (time - (*it)->arrival_time);
-				throughput++;
-				remaining_tasks--;
-				it = processes.erase(it);
-			} else {
-				time += time_slice;
-				(*it)->burst_time -= time_slice;
-				if ((*it)->burst_time != 0) {
-					std::cout << time << " : suspending PID " << (*it)->PID << " : CPU = " << (*it)->burst_time << std::endl;
-					if ((*(it++))->arrival_time < time) {
-						it = processes.begin();
-					} else {
-						it++;
-					}
-				} else {
-					std::cout << time << " : PID " << (*it)->PID << " terminated" << std::endl;
-					turnaround_time += (time - (*it)->arrival_time);
-					throughput++;
-					remaining_tasks--;
-					it = processes.erase(it);
-				}	
-			}
-			if (it == processes.end() && processes.size() > 0) {
-				it = processes.begin();
-			}
-		}
-		std::cout << "=================================" << std::endl;
+		round_robin(processes);
 		print_stats();
 	}
 
