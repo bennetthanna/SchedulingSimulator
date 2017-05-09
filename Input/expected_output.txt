@@ -19,7 +19,7 @@ Avg wait time = 7
 Avg turnaround time = 13
 
 SJF2
-Avg wait time = 5.67
+Avg wait time = 8.33
 Avg turnaround time = 19
 
 SJF3
